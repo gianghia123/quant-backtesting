@@ -36,12 +36,13 @@ class Engine:
             t1_order = list(t2_order)
             t2_order = list()
 
+            # Aggegrate data for inputing to compute_order
+            inputs = {k: v.loc[:date - DELTA_1DAY] for k, v in self.data.items()}
+            orders = portfolio.compute_order(inputs)
+
             # Takes in today's order
-            for ticker in self.tickers:
-                order = portfolio.compute_order(
-                    ticker,
-                    self.data[ticker].loc[:date - DELTA_1DAY]
-                )
+            for order in orders:
+                ticker = order.ticker
                 if order is not None:
                     order.date = date
                     price = self.data[ticker]['adj_open'].get(date)

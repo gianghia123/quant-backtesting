@@ -6,10 +6,11 @@ import pytest
 
 import quant
 
-# Sub-class of Portfolio, with multiple simplification.
+# Sub-class of Portfolio, with multiple simplifications.
 # Argument: orders, a list of orders in the form of [{ticker: Order}, ...]
-# Each entry in orders correspond to orders executed in that day.
-# DO NOT TOUCH THIS!
+# Each entry in orders corresponds to the orders executed that day.
+# compute_order() receives the whole {ticker: price data} dict and returns
+# that day's orders as a list.
 class FakePortfolio(quant.Portfolio):
     def __init__(self, orders: list[dict[str, quant.Order]]):
         super().__init__(
@@ -30,15 +31,16 @@ class FakePortfolio(quant.Portfolio):
 
     def compute_order(
             self,
-            ticker: str,
-            ohlcv_data: pd.DataFrame
-    ) -> quant.Order | None:
-        indx = len(ohlcv_data)
+            ohlcv_data: dict[str, pd.DataFrame]
+    ) -> list[quant.Order]:
+        # All tickers share the same history length, so any one of them tells
+        # us how many days of data the strategy sees today.
+        indx = len(next(iter(ohlcv_data.values())))
         try:
-            temp = self.orders[indx].get(ticker)
-            return temp
+            # The engine iterates the returned list, so drop empty slots.
+            return [o for o in self.orders[indx].values() if o is not None]
         except IndexError:
-            return None
+            return []
 
     def execute_order_t0(self, order: quant.Order) -> None:
         self.t0_order.append((self.day_index, order))
@@ -221,9 +223,9 @@ def test_double_spending_emits_warning(engine):
     assert portfolio.t2_order == []
 
 
-# Testing if compute_order returning None results in a no-op.
+# Testing if compute_order returning an empty list results in a no-op.
 
-def test_compute_order_none_is_noop(engine):
+def test_compute_order_empty_is_noop(engine):
     portfolio = FakePortfolio([])
     engine.simulate(portfolio)
 
@@ -233,3 +235,37 @@ def test_compute_order_none_is_noop(engine):
     assert portfolio.stocks == {}
     assert portfolio.current_cash == 500000
     assert (portfolio.portfolio_value == 500000).all()
+
+
+# compute_order now returns a list of orders for all tickers at once.
+
+def test_compute_order_returns_list_of_orders(engine):
+    buy_aaa = quant.Order(
+        ticker="AAA",
+        action="buy",
+        amount=10,
+        date=pd.Timestamp("2020-01-04"),
+        price=10.0,
+    )
+    buy_bbb = quant.Order(
+        ticker="BBB",
+        action="buy",
+        amount=5,
+        date=pd.Timestamp("2020-01-04"),
+        price=10.0,
+    )
+    portfolio = FakePortfolio([{"AAA": buy_aaa, "BBB": buy_bbb}])
+    engine.simulate(portfolio)
+
+    # A single compute_order call returned both orders; both execute on day 1,
+    # in the order they appear in the list...
+    assert [(day, o) for day, o in portfolio.t0_order] == [
+        (0, buy_aaa),
+        (0, buy_bbb),
+    ]
+    # ...and both settle exactly 2 days later.
+    assert [(day, o) for day, o in portfolio.t2_order] == [
+        (2, buy_aaa),
+        (2, buy_bbb),
+    ]
+    assert engine.trade_log == [buy_aaa, buy_bbb]
