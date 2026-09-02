@@ -26,10 +26,19 @@ class Engine:
         temp.set_index('date', inplace=True)
         return temp
 
-    def simulate(self, portfolio: Portfolio):
+    def simulate(
+            self,
+            portfolio: Portfolio,
+            start_date: str | pd.Timestamp | None,
+            end_date: str | pd.Timestamp | None
+    ) -> None:
+        if start_date is not None and end_date is not None:
+            date_index = pd.date_range(start_date, end_date)
+        else:
+            date_index = portfolio.date_index
         t2_order: list[Order] = []
         t1_order: list[Order] = []
-        for date in portfolio.date_index:
+        for date in date_index:
             # Settles previous T+1 and T+2 orders
             for order in t1_order:
                 portfolio.execute_order_t2(order)

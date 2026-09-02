@@ -11,14 +11,21 @@ DATA_ROOT = Path(__file__).parent.parent / Path("data")
 class Portfolio:
     def __init__(
         self,
-        date_path: Path | str,
+        date_path: Path | str | None = None,
+        date_index: pd.DatetimeIndex | None = None,
         init_cash: int = 5 * 10 ** 5,
         slippage: float = 0.001,
         commission_rate: float = 0.003,
         tax_rate: float = 0.001,
     ) -> None:
-        with open(DATA_ROOT / date_path, 'rb') as f:
-            self.date_index = pickle.load(f)
+        if date_index is not None:
+            self.date_index = date_index
+        elif date_path is not None:
+            with open(DATA_ROOT / date_path, 'rb') as f:
+                self.date_index = pickle.load(f)
+        else:
+            raise ValueError(f"Expect one of date_path or date_index not "
+                             f"to be None, receive {date_path} and {date_index}")
         self.portfolio_value = pd.Series(
             np.zeros(len(self.date_index)),
             index=self.date_index
