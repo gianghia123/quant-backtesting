@@ -37,7 +37,11 @@ class Portfolio:
         self.tax_rate = tax_rate
         self.stocks = {}
 
-    def compute_order(self, ohlcv_data: dict[str, pd.DataFrame]) -> list[Order]:
+    def compute_order(
+        self,
+        ohlcv_data: dict[str, pd.DataFrame],
+        today_price: dict[str, float]
+    ) -> list[Order | None]:
         raise NotImplementedError
 
     def execute_order_t0(self, order: Order) -> None:

@@ -4,11 +4,11 @@ import pandas as pd
 
 @dataclass
 class Order:
-    date: pd.Timestamp = field(kw_only=True)
+    date: pd.Timestamp = field(init=False)
     ticker: str
     action: str
     amount: int
-    price: float = field(kw_only=True)
+    price: float = field(init=False)
 
     def __post_init__(self):
         if self.action not in ['buy', 'sell']:

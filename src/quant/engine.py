@@ -13,7 +13,7 @@ DATA_ROOT = Path(__file__).parent.parent / Path("data")
 
 class Engine:
     def __init__(self, data_path: str | Path) -> None:
-        with open(Path(data_path), 'rb') as f:
+        with open(DATA_ROOT / Path(data_path), 'rb') as f:
             self.data = pickle.load(f)
         self.tickers = list(self.data.keys())
         self.trade_log = list()
@@ -29,8 +29,8 @@ class Engine:
     def simulate(
             self,
             portfolio: Portfolio,
-            start_date: str | pd.Timestamp | None,
-            end_date: str | pd.Timestamp | None
+            start_date: str | pd.Timestamp | None = None,
+            end_date: str | pd.Timestamp | None = None
     ) -> None:
         if start_date is not None and end_date is not None:
             date_index = pd.date_range(start_date, end_date)
@@ -46,8 +46,9 @@ class Engine:
             t2_order = list()
 
             # Aggegrate data for inputing to compute_order
-            inputs = {k: v.loc[:date - DELTA_1DAY] for k, v in self.data.items()}
-            orders = portfolio.compute_order(inputs)
+            ohlcv = {k: v.loc[:date - DELTA_1DAY] for k, v in self.data.items()}
+            price_today = {k: v.loc[date]['adj_open'] for k, v in self.data.items()}
+            orders = portfolio.compute_order(ohlcv, price_today)
 
             # Takes in today's order
             for order in orders:
