@@ -75,14 +75,14 @@ class Portfolio:
             self.portfolio_value.loc[date] += price * amount
 
     def analyze(self, pretty_print: bool = False) -> dict[str, float]:
-        returns = self.portfolio_value.pct_change().dropna()
-        final_return = self.portfolio_value.iloc[-1]
+        pv = self.portfolio_value[self.portfolio_value != 0]
+        returns = pv.pct_change().dropna()
+        final_return = pv.iloc[-1]
         total_return = (final_return - self.init_cash) / self.init_cash
-        cagr = (final_return / self.init_cash) ** (250 / len(self.portfolio_value)) - 1
+        cagr = (final_return / self.init_cash) ** (250 / len(pv)) - 1
         sharpe = (returns.mean()) / (returns.std()) * (250 ** 0.5)
-
-        rolling_max = self.portfolio_value.cummax()
-        drawdown = (self.portfolio_value - rolling_max) / rolling_max
+        rolling_max = pv.cummax()
+        drawdown = (pv - rolling_max) / rolling_max
         max_drawdown = drawdown.min()
 
         return {

@@ -33,7 +33,10 @@ class Engine:
             end_date: str | pd.Timestamp | None = None
     ) -> None:
         if start_date is not None and end_date is not None:
-            date_index = pd.date_range(start_date, end_date)
+            start_index, end_index = portfolio.date_index.get_indexer(
+                [start_date, end_date], method="nearest"
+            )
+            date_index = portfolio.date_index[start_index: end_index]
         else:
             date_index = portfolio.date_index
         t2_order: list[Order] = []
