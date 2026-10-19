@@ -32,10 +32,12 @@ class Portfolio:
         )
         self.init_cash = init_cash
         self.current_cash = init_cash
+        self.unsettled_asset = 0
         self.slippage = slippage
         self.commission_rate = commission_rate
         self.tax_rate = tax_rate
         self.stocks = {}
+        self.executed_orders = []
 
     def compute_order(
         self,
@@ -45,24 +47,39 @@ class Portfolio:
         raise NotImplementedError
 
     def execute_order_t0(self, order: Order) -> None:
+        self.executed_orders.append(order)
         if order.action == 'sell':
             self.stocks[order.ticker] = (
                 self.stocks.get(order.ticker, order.amount) - order.amount
+            )
+            self.unsettled_asset += (
+                order.amount * order.price * 
+                (1 - self.slippage - self.commission_rate - self.tax_rate)
             )
         else:
             self.current_cash -= (
                 order.price * order.amount *
                 (1 + self.slippage + self.commission_rate)
             )
+            self.unsettled_asset += (
+                order.price * order.amount *
+                (1 + self.slippage + self.commission_rate)
+            )
 
     def execute_order_t2(self, order: Order) -> None:
         if order.action == 'sell':
-            self.current_cash += (
+            delta_cash = (
                 order.price * order.amount *
                 (1 - self.slippage - self.commission_rate - self.tax_rate)
             )
+            self.current_cash += delta_cash
+            self.unsettled_asset -= delta_cash
         else:
             self.stocks[order.ticker] = self.stocks.get(order.ticker, 0) + order.amount
+            self.unsettled_asset -= (
+                order.price * order.amount *
+                (1 + self.slippage + self.commission_rate)
+            )
     
     def update_value(
         self,
@@ -73,9 +90,10 @@ class Portfolio:
         for ticker, price in price_dict.items():
             amount = self.stocks.get(ticker, 0)
             self.portfolio_value.loc[date] += price * amount
+        self.portfolio_value.loc[date] += self.unsettled_asset
 
     def analyze(self, pretty_print: bool = False) -> dict[str, float]:
-        pv = self.portfolio_value[self.portfolio_value != 0]
+        pv = self.portfolio_value.replace(0, np.nan).dropna()
         returns = pv.pct_change().dropna()
         final_return = pv.iloc[-1]
         total_return = (final_return - self.init_cash) / self.init_cash
