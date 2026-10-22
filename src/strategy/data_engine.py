@@ -199,34 +199,33 @@ def get_historical_data(path: str | Path = PRICES_PATH, default_start: str = DEF
 # --------------------------------------------------------------------------
 # Today's opens
 # --------------------------------------------------------------------------
-def get_today_opens(symbols=None, resolution="1D", client=None, pause=0.1,
-                    price_scale: float = PRICE_SCALE, dry_run=False):
-    """
-    Fetch today's open price for each ticker (default: UNIVERSE).
-
-    Returns {symbol: {"open": float} | None | {"error": str}}
-      - None  -> no candle yet today (before the ATO match, or non-trading day)
-      - error -> request failed for that ticker only
-    """
+def get_today_opens(symbols=None, resolution="1", client=None, pause=0.1,
+                    price_scale: float = PRICE_SCALE, dry_run=False, debug=False):
     client = client or _get_client()
     now = datetime.now(VN_TZ)
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start_ts = int(day_start.timestamp())
-    end_ts = int((day_start + timedelta(days=1)).timestamp())
+    day_start_ts = int(now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+    end_ts = day_start_ts + 86400
+    start_ts = day_start_ts - 86400   # lookback window, like the probe
 
     results = {}
     for symbol in dict.fromkeys(symbols or UNIVERSE):  # dedupe, keep order
         try:
             rows = _fetch_candles(client, symbol, resolution, start_ts, end_ts,
                                   dry_run=dry_run)
-            today = [(r[0], r[1]) for r in rows
-                     if datetime.fromtimestamp(r[0], VN_TZ).date() == now.date()]
+            today = [(r[0], r[1]) for r in rows if day_start_ts <= r[0] < end_ts]
+
+            if debug:
+                fmt = lambda ts: datetime.fromtimestamp(ts, VN_TZ).strftime("%m-%d %H:%M")
+                print(f"[{symbol}] fetched={len(rows)} today={len(today)} "
+                      f"window={fmt(start_ts)} -> {fmt(end_ts)} (now {now:%m-%d %H:%M})")
+                if rows:
+                    print(f"   first row: {fmt(rows[0][0])}   last row: {fmt(rows[-1][0])}")
+
             results[symbol] = min(today)[1] * price_scale if today else None
         except Exception as e:
             results[symbol] = {"error": str(e)}
         time.sleep(pause)  # gentle on rate limits
     return results
-
 
 if __name__ == "__main__":
     prices, dates = get_historical_data()

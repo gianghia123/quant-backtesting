@@ -25,6 +25,7 @@ class MeanVar(Portfolio):
         self.lookback = lookback
 
     def compute_order(self, ohlcv_data: dict[str, pd.DataFrame], today_price: dict[str, float]) -> list[Order | None]:
+        print(today_price)
         if self.current_day != 0:
             if self.current_day == 2:
                 orders = []
@@ -68,6 +69,9 @@ class MeanVar(Portfolio):
 
             orders = []
             for idx, ticker in enumerate(tickers):
+                if today_price[ticker] is None:
+                    print(f"{ticker}'s price is None, break out of loop.")
+                    break
                 allocated = self.current_cash * 0.9 * x.value[idx]
                 buy_amount = allocated / today_price[ticker]
                 rounded = buy_amount - (buy_amount % 100)
